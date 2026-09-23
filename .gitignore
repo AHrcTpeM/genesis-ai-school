@@ -1,0 +1,48 @@
+# IDE & Editor files
+.vscode/
+.idea/
+.agents/
+*.swp
+*.swo
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Cache directories
+.cache/
+.pytest_cache/
+.mypy_cache/
+.pyrefly/
+
+# Generated outputs & reports
+output/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# OS specific
+.DS_Store
+Thumbs.db

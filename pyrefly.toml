@@ -1,0 +1,5 @@
+preset = "basic"
+
+search-path = [
+    "wikipedia-market-insights/scripts",
+]
