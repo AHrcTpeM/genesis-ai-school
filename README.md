@@ -1,8 +1,8 @@
-# AI Product Engineering School — Task 1: Wikipedia Market Insights Skill
+# Wikipedia Market Insights — Agent Skill
 
-This repository contains the complete implementation of **Task 1** for the AI Product Engineering School.
+This repository contains a standalone, specification-compliant [Agent Skill](https://agentskills.io/specification) named **`wikipedia-market-insights`**, located in the `wikipedia-market-insights/` directory.
 
-The deliverable is a standalone, specification-compliant [Agent Skill](https://agentskills.io/specification) named **`wikipedia-market-insights`**, located in the `wikipedia-market-insights/` directory.
+It empowers AI agents to evaluate B2C product demand, analyze topic interest across languages, detect seasonality/bot traffic, and generate executive reports.
 
 ---
 
