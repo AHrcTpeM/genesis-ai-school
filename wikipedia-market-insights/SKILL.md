@@ -1,0 +1,155 @@
+---
+name: wikipedia-market-insights
+description: Analyze Wikipedia page views data to evaluate B2C product demand across topics and languages, detect seasonal and academic spikes, assess trend reliability (trust score), and generate comparative charts and 1-page PDF executive reports. Use when founders or product teams need to validate course demand, prioritize localization languages, or verify organic interest trends using Wikimedia analytics.
+license: MIT
+compatibility: Requires Python 3.8+ with requests, matplotlib, pandas, reportlab
+metadata:
+  version: "1.0.0"
+  category: "market-research"
+  author: "Product Engineering Team"
+---
+
+# Wikipedia Market Insights Agent Skill
+
+This skill empowers AI agents to validate B2C product ideas, evaluate educational course demand, and prioritize language localization by analyzing historical Wikimedia page views.
+
+It addresses common analytical traps:
+1. **Language & Population Disparity**: Normalizes raw views against total project traffic (views per million total wiki visits) so a smaller market like Czechia is fairly compared to a larger market like Poland or Germany.
+2. **Academic & School Seasonality**: Automatically detects September/May school curriculum spikes (e.g., high school astronomy in Ukraine) and discounts them from commercial B2C intent.
+3. **Bot & Crawler Traffic**: Queries real humans (`agent=user`) while tracking crawler proportions (`agent=spider`) to penalize artificial bot surges.
+4. **Missing Concept Handling**: Uses Wikidata sitelinks and MediaWiki `langlinks` to resolve cross-language titles and explicitly detects when a direct concept does not exist (e.g. Polish Wikipedia lacking a standalone article for intermittent fasting).
+
+---
+
+## Quick Execution Commands
+
+The skill provides a self-contained CLI executable at `scripts/wiki_insights.py`. Agents should execute this script using Bash or terminal tools.
+
+### 0. Environment & Dependency Check (Pre-Flight)
+Before first execution, verify Python 3 and required libraries:
+```bash
+python3 -c "import requests, matplotlib, pandas, numpy, reportlab" 2>/dev/null || pip install -r requirements.txt
+```
+
+### 1. Multi-Language Comparison (e.g., Polish vs. Czech Intermittent Fasting)
+```bash
+python3 scripts/wiki_insights.py analyze \
+  --topic "Intermittent fasting" \
+  --langs pl,cs \
+  --period 2y \
+  --output-dir ./output/fasting \
+  --chart \
+  --pdf
+```
+
+### 2. Single-Market Trustworthiness & Seasonality (e.g., Ukrainian Astronomy Course)
+```bash
+python3 scripts/wiki_insights.py analyze \
+  --topic "Astronomy" \
+  --langs uk \
+  --period 2y \
+  --output-dir ./output/astronomy \
+  --chart \
+  --pdf
+```
+
+### 3. Audience Prioritization for Localization (e.g., English Learning Across Markets)
+```bash
+python3 scripts/wiki_insights.py analyze \
+  --topic "English language" \
+  --langs uk,pl,es,de \
+  --period 2y \
+  --output-dir ./output/english \
+  --chart \
+  --pdf
+```
+
+### 4. Topic Resolution Only (Fast Pre-Check)
+```bash
+python3 scripts/wiki_insights.py resolve \
+  --topic "Intermittent fasting" \
+  --langs pl,cs,de,fr
+```
+
+---
+
+## Agent Decision Workflow
+
+Follow this 5-step workflow when answering founder questions:
+
+```
+[User Request] 
+      │
+      ▼
+0. Environment Pre-Flight Check:
+   ├── Verify dependencies: python3 -c "import requests, matplotlib, pandas, reportlab"
+   └── If missing: propose running 'pip install -r requirements.txt' to user
+      │
+      ▼
+1. Extract Topic & Languages (e.g., 'astronomy', 'uk')
+      │
+      ▼
+2. Run CLI Tool (`scripts/wiki_insights.py analyze ...`)
+      │
+      ▼
+3. Parse JSON Output:
+   ├── Check `per_language_analysis[lang].exists`: Is there a direct page?
+   ├── Check `summary.overall_trust_score`: Is the score >= 75?
+   ├── Check `seasonality.is_academic_seasonal`: Is growth driven by school homework?
+   └── Check `ranked_markets`: Which market has highest normalized mindshare?
+      │
+      ▼
+4. Formulate Founder Response:
+   ├── Direct Answer (Yes / No / Proceed with Caution)
+   ├── Key Numbers (Human Views, YoY %, Mindshare VPM, Trust Score)
+   ├── Critical Caveats (Seasonality, Bot Ratio, Missing Direct Page)
+   └── Deliver Artifacts (Clickable links to generated PNG chart and 1-page PDF report)
+```
+
+
+---
+
+## Interpreting Output Metrics
+
+### 1. Normalized Market Mindshare (`avg_views_per_million`)
+* **What it is**: `(article_views / total_project_views) * 1,000,000`
+* **Why it matters**: Absolute pageviews favor giant languages (Spanish, German). Normalized mindshare reflects **intensity of interest** relative to the total internet population in that language.
+* **Benchmark**:
+  - `> 100 vpm`: Massive core interest (e.g. English language in Ukraine ~127 vpm).
+  - `20 - 100 vpm`: Solid mainstream topic (e.g. English in Spain ~50 vpm).
+  - `< 10 vpm`: Specialized niche or emerging interest.
+
+### 2. Trustworthiness Score (0 to 100)
+* **80 - 100 (HIGH_CONFIDENCE)**: Steady, human-driven traffic with consistent demand. Reliable for B2C product validation.
+* **55 - 79 (MODERATE_CONFIDENCE)**: Real interest exists, but seasonal swings, media spikes, or curriculum patterns are present. Verify willingness to pay before large investments.
+* **0 - 54 (LOW_CONFIDENCE)**: Significant risk of false signal (e.g. bot-inflated, one-off viral spike, or missing direct article).
+
+### 3. Seasonality & The "School Homework" Trap
+* If `is_academic_seasonal: true` (huge September or May peak):
+  - In educational topics, September spikes mean **students looking up school subjects**, NOT adults ready to buy an online course.
+  - Advise the founder to either:
+    1. Pivot the product to high-school exam prep (e.g. ZNO/NMT prep in Ukraine).
+    2. Discount the September spike and evaluate the base volume during winter/spring months.
+
+### 4. Missing Direct Page (`exists: false`)
+* If an article does not exist on a target Wikipedia (e.g. Polish `Intermittent fasting`):
+  - Do NOT invent numbers. Report clearly that the concept lacks a dedicated page.
+  - Check `closest_candidates` (e.g. `Głodówka lecznicza`, `Paleolityczny styl życia`).
+  - Explain to the founder that lack of a Wikipedia page may indicate early/unorganized interest, recommending external search validation (Google Trends).
+
+---
+
+## Generated Artifacts
+
+Each analysis run creates two persistent files in `--output-dir`:
+1. **`<topic>_<langs>_chart.png`**: High-resolution 2-panel chart showing absolute views with 3-month rolling trendline, and normalized mindshare comparison.
+2. **`<topic>_<langs>_report.pdf`**: Publication-ready, strictly **1-page executive PDF report** featuring KPI scorecards, embedded chart, bulleted findings, founder takeaway, and methodology caveats.
+
+---
+
+## Reference Documentation
+
+For deeper details, consult the reference guides in `references/`:
+* [API Reference](references/API_REFERENCE.md): Wikimedia Analytics API endpoints, parameters, and rate-limiting.
+* [Metrics Guide](references/METRICS_GUIDE.md): Mathematical definitions for CAGR, YoY, Z-Score outlier detection, and Trust Score.
+* [Interpretation Guide](references/INTERPRETATION_GUIDE.md): B2C go-to-market heuristics, interview tips, and triangulation strategies.
