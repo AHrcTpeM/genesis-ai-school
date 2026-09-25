@@ -316,3 +316,108 @@ class AnalyticsEngine:
             "bot_ratio_percent": round(spider_ratio * 100, 1),
             "deductions": deductions,
         }
+
+    @classmethod
+    def rank_markets(cls, analysis_by_lang: Dict[str, Any], target_langs: List[str]) -> List[Dict[str, Any]]:
+        """Rank language markets by normalized mindshare (views_per_million)."""
+        # 3. Market Comparison & Priority Ranking
+        valid_langs = [l for l in target_langs if analysis_by_lang.get(l, {}).get("exists")]
+        ranked_markets = []
+        for l in valid_langs:
+            d = analysis_by_lang[l]
+            ranked_markets.append({
+                "lang": l,
+                "title": d["title"],
+                "total_views": d["growth"]["total_views"],
+                "yoy_growth": d["growth"]["yoy_growth_percent"],
+                "avg_views_per_million": d["normalized"]["avg_views_per_million"],
+                "trust_score": d["trustworthiness"]["trust_score"],
+                "trust_rating": d["trustworthiness"]["rating"],
+            })
+        # Sort by normalized mindshare by default for fair size comparison
+        ranked_markets.sort(key=lambda x: x["avg_views_per_million"], reverse=True)
+        return ranked_markets
+
+    @classmethod
+    def synthesize_findings_and_recommendations(
+        cls,
+        topic: str,
+        target_langs: List[str],
+        analysis_by_lang: Dict[str, Any],
+        ranked_markets: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Synthesize strategic findings, limitations, overall KPIs, and founder recommendation."""
+        findings = []
+        limitations = [
+            "Data reflects Wikipedia reader lookups; informational interest is a leading indicator but does not guarantee commercial willingness to pay.",
+            "Traffic is filtered for human users ('agent=user'); automated web crawlers have been isolated.",
+            "Current incomplete ongoing month was excluded to avoid artificial negative bias in monthly metrics.",
+        ]
+
+        for l in target_langs:
+            d = analysis_by_lang.get(l, {})
+            if not d.get("exists"):
+                candidates = d.get("closest_candidates", [])
+                candidates_str = f" ({', '.join(candidates[:2])})" if candidates else ""
+                findings.append(
+                    f"[{l.upper()}] No direct Wikipedia page exists for '{topic}'. {d.get('notes', '')} "
+                    f"Suggest validating search volume via external tools or proxy concepts{candidates_str}."
+                )
+            else:
+                g = d["growth"]
+                s = d["seasonality"]
+                t = d["trustworthiness"]
+                norm_vpm = d["normalized"]["avg_views_per_million"]
+
+                yoy_txt = f"{g['yoy_growth_percent']:+.1f}% YoY" if g.get("yoy_growth_percent") is not None else "N/A"
+                finding_str = f"[{l.upper()}] '{d['title']}': {g['total_views']:,} total human views ({yoy_txt}), mindshare: {norm_vpm} views/1M total wiki views."
+
+                if s.get("is_academic_seasonal"):
+                    finding_str += f" Notable academic seasonality detected: {s.get('peak_month')} peak is {s.get('peak_index')}x baseline (school homework skew)."
+                elif s.get("has_strong_seasonality"):
+                    finding_str += f" Seasonal peak occurs in {s.get('peak_month')} ({s.get('peak_index')}x baseline)."
+
+                if t["trust_score"] < 60:
+                    finding_str += f" Trust warning: {t['rating']} ({', '.join(t['deductions'])})."
+
+                findings.append(finding_str)
+
+        # Formulate founder recommendation
+        if not ranked_markets:
+            rec = "Topic does not have dedicated Wikipedia articles in the requested languages. Validate market demand via Google Trends or ad test before committing product resources."
+        else:
+            top_m = ranked_markets[0]
+            if top_m["trust_score"] >= 75 and (top_m["yoy_growth"] is None or top_m["yoy_growth"] >= 0):
+                rec = (
+                    f"Prioritize {top_m['lang'].upper()} market (Top normalized mindshare: {top_m['avg_views_per_million']} per 1M views, "
+                    f"Trust: {top_m['trust_score']}/100 {top_m['trust_rating']}). Demand is steady and human-driven. Proceed to MVP testing."
+                )
+            elif any(analysis_by_lang.get(m["lang"], {}).get("seasonality", {}).get("is_academic_seasonal") for m in ranked_markets):
+                rec = (
+                    "Demand exhibits heavy school curriculum seasonality (September spike). "
+                    "If building a B2C product, target school exam preparation or adapt marketing outside the summer drop."
+                )
+            else:
+                rec = (
+                    f"{top_m['lang'].upper()} shows highest relative interest, but trust score is {top_m['trust_score']}/100. "
+                    "Conduct small-scale landing page test to confirm conversion before full localization."
+                )
+
+        # Overall YoY growth weighted
+        yoy_list = [m["yoy_growth"] for m in ranked_markets if m["yoy_growth"] is not None]
+        overall_yoy = round(float(sum(yoy_list) / len(yoy_list)), 1) if yoy_list else None
+
+        # Overall Trust Score weighted
+        trust_list = [m["trust_score"] for m in ranked_markets]
+        overall_trust = int(round(sum(trust_list) / len(trust_list))) if trust_list else None
+
+        top_market = ranked_markets[0]["lang"].upper() if ranked_markets else "NONE"
+
+        return {
+            "findings": findings,
+            "recommendation": rec,
+            "limitations": limitations,
+            "overall_yoy": overall_yoy,
+            "overall_trust": overall_trust,
+            "top_market": top_market,
+        }
