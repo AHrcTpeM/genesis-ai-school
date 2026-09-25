@@ -202,13 +202,7 @@ class TopicResolver:
         else:
             candidate_sources.extend(["en", "uk"])
 
-        # Fetch canonical sitelinks
-        sitelinks: Dict[str, str] = {}
-        for src in candidate_sources:
-            links = self.get_wikidata_sitelinks(src, topic)
-            if links:
-                sitelinks = links
-                break
+        sitelinks: Optional[Dict[str, str]] = None
 
         for lang in target_langs:
             # Case 1: Topic directly exists in target language
@@ -222,6 +216,15 @@ class TopicResolver:
                     "notes": f"Exact article '{direct_check['canonical_title']}' exists on {lang}.wikipedia.",
                 }
                 continue
+
+            # Fetch Wikidata sitelinks lazily only if Case 1 failed and sitelinks not fetched yet
+            if sitelinks is None:
+                sitelinks = {}
+                for src in candidate_sources:
+                    links = self.get_wikidata_sitelinks(src, topic)
+                    if links:
+                        sitelinks = links
+                        break
 
             # Case 2: Sitelink exists in Wikidata / interlanguage links
             if lang in sitelinks:
