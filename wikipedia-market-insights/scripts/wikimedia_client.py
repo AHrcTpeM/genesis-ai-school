@@ -70,23 +70,9 @@ class WikimediaClient:
         backoff = 1.0
         for attempt in range(retries):
             try:
-                # === [DEBUG TEMP PRINT REQUEST] ===
-                print(f"\n[ANALYTICS API REQUEST] GET {url}")
-                # === [END DEBUG TEMP PRINT] ===
-
                 resp = self.session.get(url, timeout=15)
-
-                # === [DEBUG TEMP PRINT RESPONSE STATUS] ===
-                print(f"[ANALYTICS API RESPONSE STATUS] {resp.status_code} for {url}")
-                # === [END DEBUG TEMP PRINT] ===
-
                 if resp.status_code == 200:
                     data = resp.json()
-
-                    # === [DEBUG TEMP PRINT RESPONSE DATA] ===
-                    print(f"[ANALYTICS API RESPONSE DATA] Items count: {len(data.get('items', []))} | First item: {data.get('items', [{}])[0] if data.get('items') else None}")
-                    # === [END DEBUG TEMP PRINT] ===
-
                     try:
                         with open(cache_path, "w", encoding="utf-8") as f:
                             json.dump({"_cached_at": time.time(), "url": url, "data": data}, f)

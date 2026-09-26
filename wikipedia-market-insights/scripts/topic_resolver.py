@@ -4,12 +4,11 @@ Resolves concept titles across Wikipedia language editions, follows redirects,
 detects missing articles using Wikidata sitelinks, and finds relevant candidate topics.
 """
 
-from reportlab.lib import styles
-from reportlab.lib import styles
-from reportlab.lib import styles
+import hashlib
 import json
 import logging
 import os
+import time
 import urllib.parse
 from typing import Any, Dict, List, Optional
 import requests
@@ -20,6 +19,8 @@ except ImportError:
     from wikimedia_client import DEFAULT_CACHE_DIR, USER_AGENT
 
 logger = logging.getLogger(__name__)
+
+CACHE_TTL_SECONDS = 86400  # 24 hours, matches WikimediaClient default
 
 
 class TopicResolver:
@@ -46,41 +47,33 @@ class TopicResolver:
         self.close()
 
     def _api_get(self, url: str, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Cached GET helper for MediaWiki/Wikidata API."""
+        """Cached GET helper for MediaWiki/Wikidata API.
+
+        Uses SHA256 for deterministic cache keys (safe across process restarts)
+        and a TTL of CACHE_TTL_SECONDS to avoid serving stale article metadata.
+        """
         query_string = urllib.parse.urlencode(sorted(params.items()))
         full_url = f"{url}?{query_string}"
-        cache_key = f"mw_{abs(hash(full_url))}.json"
+        cache_key = f"mw_{hashlib.sha256(full_url.encode('utf-8')).hexdigest()}.json"
         cache_file = os.path.join(self.cache_dir, cache_key)
 
         if os.path.exists(cache_file):
             try:
                 with open(cache_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    cached = json.load(f)
+                cached_at = cached.get("_cached_at", 0)
+                if (time.time() - cached_at) < CACHE_TTL_SECONDS:
+                    return cached.get("data")
             except Exception:
                 pass
 
         try:
-            # === [DEBUG TEMP PRINT REQUEST] ===
-            print(f"\n[API REQUEST] GET {url}")
-            print(f"[API REQUEST PARAMS] {json.dumps(params, ensure_ascii=False)}")
-            # === [END DEBUG TEMP PRINT] ===
-
             resp = self.session.get(url, params=params, timeout=12)
-
-            # === [DEBUG TEMP PRINT RESPONSE STATUS] ===
-            print(f"[API RESPONSE STATUS] {resp.status_code} for {url}")
-            # === [END DEBUG TEMP PRINT] ===
-
             if resp.status_code == 200:
                 data = resp.json()
-
-                # === [DEBUG TEMP PRINT RESPONSE DATA] ===
-                print(f"[API RESPONSE DATA] {json.dumps(data, ensure_ascii=False)[:300]}...")
-                # === [END DEBUG TEMP PRINT] ===
-
                 try:
                     with open(cache_file, "w", encoding="utf-8") as f:
-                        json.dump(data, f)
+                        json.dump({"_cached_at": time.time(), "url": full_url, "data": data}, f)
                 except Exception:
                     pass
                 return data
