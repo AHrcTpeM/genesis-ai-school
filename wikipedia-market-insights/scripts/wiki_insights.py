@@ -8,10 +8,13 @@ generating comparison charts, and creating 1-page executive PDF reports.
 
 import argparse
 import json
+import logging
 import os
 import sys
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 try:
     from .analytics import AnalyticsEngine
@@ -46,6 +49,7 @@ def compute_date_range(period: str, end_date: Optional[str] = None) -> tuple[str
     elif period == "3y":
         start_dt = end_dt - timedelta(days=1095)
     else:
+        logger.warning(f"Unknown period '{period}', falling back to '2y'. Supported: 2y, 1y, 6m, 3y.")
         # Default to 2y
         start_dt = end_dt - timedelta(days=730)
 
@@ -266,7 +270,7 @@ def main():
     analyze_parser = subparsers.add_parser("analyze", help="Analyze topic across languages")
     analyze_parser.add_argument("--topic", required=True, help="Topic name (e.g. 'Intermittent fasting', 'Astronomy')")
     analyze_parser.add_argument("--langs", required=True, help="Comma-separated language codes (e.g. 'pl,cs' or 'uk')")
-    analyze_parser.add_argument("--period", default="2y", help="Time period: '2y', '1y', '6m' (default: 2y)")
+    analyze_parser.add_argument("--period", default="2y", help="Time period: '2y', '1y', '6m', '3y' (default: 2y)")
     analyze_parser.add_argument("--start", default=None, help="Explicit start date YYYYMMDD")
     analyze_parser.add_argument("--end", default=None, help="Explicit end date YYYYMMDD")
     analyze_parser.add_argument("--granularity", default="monthly", choices=["monthly", "daily"])

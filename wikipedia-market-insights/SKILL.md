@@ -2,7 +2,7 @@
 name: wikipedia-market-insights
 description: Analyze Wikipedia page views data to evaluate B2C product demand across topics and languages, detect seasonal and academic spikes, assess trend reliability (trust score), and generate comparative charts and 1-page PDF executive reports. Use when founders or product teams need to validate course demand, prioritize localization languages, or verify organic interest trends using Wikimedia analytics.
 license: MIT
-compatibility: Requires Python 3.8+ with requests, matplotlib, pandas, reportlab
+compatibility: Requires Python 3.8+ with requests, matplotlib, pandas, numpy, reportlab
 metadata:
   version: "1.0.0"
   category: "market-research"
@@ -85,7 +85,7 @@ Follow this 5-step workflow when answering founder questions:
       │
       ▼
 0. Environment Pre-Flight Check:
-   ├── Verify dependencies: python3 -c "import requests, matplotlib, pandas, reportlab"
+   ├── Verify dependencies: python3 -c "import requests, matplotlib, pandas, numpy, reportlab"
    └── If missing: propose running 'pip install -r requirements.txt' to user
       │
       ▼
@@ -155,8 +155,8 @@ Follow this 5-step workflow when answering founder questions:
 ## Generated Artifacts
 
 Each analysis run creates two persistent files in `--output-dir`:
-1. **`<topic>_<langs>_chart.png`**: High-resolution 2-panel chart showing absolute views with 3-month rolling trendline, and normalized mindshare comparison.
-2. **`<topic>_<langs>_report.pdf`**: Publication-ready, strictly **1-page executive PDF report** featuring KPI scorecards, embedded chart, bulleted findings, founder takeaway, and methodology caveats.
+1. **`<topic>_<langs>_chart.png`**: High-resolution 2-panel chart showing absolute views with 3-month rolling trendline, and normalized mindshare comparison. Filename uses lowercase with underscores, e.g. `intermittent_fasting_pl_cs_chart.png`.
+2. **`<topic>_<langs>_report.pdf`**: Publication-ready, strictly **1-page executive PDF report** featuring KPI scorecards, embedded chart, bulleted findings, founder takeaway, and methodology caveats. E.g. `intermittent_fasting_pl_cs_report.pdf`.
 
 ---
 
