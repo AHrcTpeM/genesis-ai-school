@@ -31,7 +31,16 @@ Before first execution, verify Python 3 and required libraries:
 python3 -c "import requests, matplotlib, pandas, numpy, reportlab" 2>/dev/null || pip install -r requirements.txt
 ```
 
-### 1. Multi-Language Comparison (e.g., Polish vs. Czech Intermittent Fasting)
+### 1. Stage 1: Topic Resolution Pre-Check (Mandatory First Step)
+```bash
+python3 scripts/wiki_insights.py resolve \
+  --topic "Intermittent fasting" \
+  --langs pl,cs
+```
+
+### 2. Stage 2: Deep Analytics Execution
+
+#### Scenario A: Direct/Sitelink Match Exists for All Languages
 ```bash
 python3 scripts/wiki_insights.py analyze \
   --topic "Intermittent fasting" \
@@ -42,33 +51,27 @@ python3 scripts/wiki_insights.py analyze \
   --pdf
 ```
 
-### 2. Single-Market Trustworthiness & Seasonality (e.g., Ukrainian Astronomy Course)
-```bash
-python3 scripts/wiki_insights.py analyze \
-  --topic "Astronomy" \
-  --langs uk \
-  --period 2y \
-  --output-dir ./output/astronomy \
-  --chart \
-  --pdf
-```
+#### Scenario B: Missing Direct Article for a Language (Smart Proxy Fallback)
+If `resolve` shows `exists: false` for a language (e.g., `pl`), analyze direct-match languages first, then evaluate `closest_candidates`, select the most relevant proxy concept (e.g. `Głodówka lecznicza`), and run `analyze` for that proxy concept:
 
-### 3. Audience Prioritization for Localization (e.g., English Learning Across Markets)
 ```bash
+# 1. Analyze exact match language(s)
 python3 scripts/wiki_insights.py analyze \
-  --topic "English language" \
-  --langs uk,pl,es,de \
-  --period 2y \
-  --output-dir ./output/english \
-  --chart \
-  --pdf
-```
-
-### 4. Topic Resolution Only (Fast Pre-Check)
-```bash
-python3 scripts/wiki_insights.py resolve \
   --topic "Intermittent fasting" \
-  --langs pl,cs,de,fr
+  --langs cs \
+  --period 2y \
+  --output-dir ./output/fasting_cs \
+  --chart \
+  --pdf
+
+# 2. Analyze selected proxy concept for missing language(s)
+python3 scripts/wiki_insights.py analyze \
+  --topic "Głodówka lecznicza" \
+  --langs pl \
+  --period 2y \
+  --output-dir ./output/fasting_pl_proxy \
+  --chart \
+  --pdf
 ```
 
 ---
@@ -89,20 +92,27 @@ Follow this 5-step workflow when answering founder questions:
 1. Extract Topic & Languages (e.g., 'astronomy', 'uk')
       │
       ▼
-2. Run CLI Tool (`scripts/wiki_insights.py analyze ...`)
+2. Resolve Topic Across Target Languages (`scripts/wiki_insights.py resolve ...`)
+   ├── If `exists: true` for all → proceed with original topic.
+   └── If `exists: false` for any lang → select best candidate from `closest_candidates` as proxy.
       │
       ▼
-3. Parse JSON Output:
+3. Run CLI Analytics (`scripts/wiki_insights.py analyze ...`)
+   ├── Run for exact topic on direct-match languages.
+   └── Run for proxy concept on missing-page language(s).
+      │
+      ▼
+4. Parse JSON Output:
    ├── Check `per_language_analysis[lang].exists`: Is there a direct page?
    ├── Check `summary.overall_trust_score`: Is the score >= 75?
    ├── Check `seasonality.is_academic_seasonal`: Is growth driven by school homework?
    └── Check `ranked_markets`: Which market has highest normalized mindshare?
       │
       ▼
-4. Formulate Founder Response:
+5. Formulate Founder Response:
    ├── Direct Answer (Yes / No / Proceed with Caution)
    ├── Key Numbers (Human Views, YoY %, Mindshare VPM, Trust Score)
-   ├── Critical Caveats (Seasonality, Bot Ratio, Missing Direct Page)
+   ├── Critical Caveats (Seasonality, Bot Ratio, Proxy Disclaimer if applicable)
    └── Deliver Artifacts (Clickable links to generated PNG chart and 1-page PDF report)
 ```
 
@@ -131,11 +141,14 @@ Follow this 5-step workflow when answering founder questions:
     1. Pivot the product to high-school exam prep (e.g. ZNO/NMT prep in Ukraine).
     2. Discount the September spike and evaluate the base volume during winter/spring months.
 
-### 4. Missing Direct Page (`exists: false`)
+### 4. Missing Direct Page (`exists: false`) & Smart Proxy Fallback
 * If an article does not exist on a target Wikipedia (e.g. Polish `Intermittent fasting`):
-  - Do NOT invent numbers. Report clearly that the concept lacks a dedicated page.
-  - Check `closest_candidates` (e.g. `Głodówka lecznicza`, `Paleolityczny styl życia`).
-  - Explain to the founder that lack of a Wikipedia page may indicate early/unorganized interest, recommending external search validation (Google Trends).
+  - Do NOT give up or leave the founder with 0 views.
+  - Inspect `closest_candidates` returned by `resolve` (e.g. `Głodówka lecznicza`, `Paleolityczny styl życia`).
+  - Use agent intelligence to select the most relevant proxy concept (e.g. `Głodówka lecznicza`).
+  - Run `wiki_insights.py analyze` for the proxy topic on that language.
+  - In the response, explicitly state:
+    > ⚠️ **Proxy Topic Disclaimer**: Direct article for '[Topic]' does not exist on [lang].wikipedia. Analyzed closest proxy concept '[Proxy Title]' to estimate regional demand in the broader category.
 
 ---
 
