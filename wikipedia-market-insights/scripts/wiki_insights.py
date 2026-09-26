@@ -12,7 +12,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ except ImportError:
     from wikimedia_client import WikimediaClient
 
 
-def compute_date_range(period: str, end_date: Optional[str] = None) -> tuple[str, str]:
+def compute_date_range(period: str, end_date: Optional[str] = None) -> Tuple[str, str]:
     """Compute start and end 'YYYYMMDD' strings given period (e.g. '2y', '1y', '6m')."""
     now = datetime.now()
     if end_date:
@@ -262,6 +262,58 @@ def analyze_topic(
     return result
 
 
+def _compact_result(result: Dict[str, Any]) -> Dict[str, Any]:
+    """Strip verbose per-language arrays to reduce token count for cheap models.
+
+    Removes monthly_indices, raw outlier lists, avg_monthly_views/median fields.
+    Reduces typical 4-language output from ~8-12k tokens to ~1-2k tokens.
+    Use with --compact flag when running on small-context or budget models.
+    """
+    compact = {k: v for k, v in result.items() if k != "per_language_analysis"}
+    compact["per_language_analysis"] = {}
+    for lang, d in result.get("per_language_analysis", {}).items():
+        if not d.get("exists"):
+            compact["per_language_analysis"][lang] = {
+                "exists": False,
+                "resolution_method": d.get("resolution_method"),
+                "closest_candidates": d.get("closest_candidates", [])[:3],
+                "notes": d.get("notes"),
+            }
+        else:
+            g = d.get("growth", {})
+            s = d.get("seasonality", {})
+            t = d.get("trustworthiness", {})
+            compact["per_language_analysis"][lang] = {
+                "exists": True,
+                "title": d.get("title"),
+                "resolution_method": d.get("resolution_method"),
+                "growth": {
+                    "total_views": g.get("total_views"),
+                    "yoy_growth_percent": g.get("yoy_growth_percent"),
+                    "cagr_percent": g.get("cagr_percent"),
+                    "num_months": g.get("num_months"),
+                },
+                "normalized": d.get("normalized"),
+                "seasonality": {
+                    "is_academic_seasonal": s.get("is_academic_seasonal"),
+                    "has_strong_seasonality": s.get("has_strong_seasonality"),
+                    "peak_month": s.get("peak_month"),
+                    "peak_index": s.get("peak_index"),
+                },
+                "trustworthiness": {
+                    "trust_score": t.get("trust_score"),
+                    "rating": t.get("rating"),
+                    "explanation": t.get("explanation"),
+                    "deductions": t.get("deductions", []),
+                },
+                "anomalies": {
+                    "is_spike_dominated": d.get("anomalies", {}).get("is_spike_dominated"),
+                    "top_2_months_share_percent": d.get("anomalies", {}).get("top_2_months_share_percent"),
+                },
+            }
+    return compact
+
+
 def main():
     parser = argparse.ArgumentParser(description="Wikipedia Market Insights Skill CLI")
     subparsers = parser.add_subparsers(dest="command", help="Sub-commands")
@@ -279,6 +331,8 @@ def main():
     analyze_parser.add_argument("--no-chart", dest="chart", action="store_false", help="Do not generate chart")
     analyze_parser.add_argument("--pdf", action="store_true", default=True, help="Generate 1-page PDF report (default: True)")
     analyze_parser.add_argument("--no-pdf", dest="pdf", action="store_false", help="Do not generate PDF report")
+    analyze_parser.add_argument("--compact", action="store_true", default=False,
+                                help="Output compact JSON (strips raw monthly arrays). Recommended for small-context models.")
 
     # Command: resolve
     resolve_parser = subparsers.add_parser("resolve", help="Resolve topic titles across languages")
@@ -303,12 +357,15 @@ def main():
             make_chart=args.chart,
             make_pdf=args.pdf,
         )
-        print(json.dumps(result, indent=2, ensure_ascii=False))
+        print(json.dumps(result if not args.compact else _compact_result(result), indent=2, ensure_ascii=False))
 
     elif args.command == "resolve":
         langs = [l.strip().lower() for l in args.langs.split(",") if l.strip()]
         resolver = TopicResolver()
-        res = resolver.resolve_topic_for_languages(args.topic, langs)
+        try:
+            res = resolver.resolve_topic_for_languages(args.topic, langs)
+        finally:
+            resolver.close()
         print(json.dumps(res, indent=2, ensure_ascii=False))
 
 
